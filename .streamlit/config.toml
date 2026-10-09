@@ -1,0 +1,16 @@
+[theme]
+# Vaani light theme: warm off-white canvas, indigo-purple brand colour, charcoal text.
+# The app's CSS (app.py) builds on these values; keep them in sync with the :root tokens there.
+base = "light"
+primaryColor = "#5B4BDB"
+backgroundColor = "#FAF8F5"
+secondaryBackgroundColor = "#F2EFEA"
+textColor = "#1F2330"
+borderColor = "#E6E1D9"
+baseRadius = "10px"
+showWidgetBorder = true
+font = "Inter, system-ui, -apple-system, Segoe UI, sans-serif"
+
+[theme.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F4F0"

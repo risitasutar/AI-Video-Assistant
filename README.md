@@ -2,7 +2,7 @@
 
 > **Transform any video or audio into structured intelligence — transcribe, summarize, extract insights, and chat with your content using AI.**
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.35%2B-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![LangChain](https://img.shields.io/badge/LangChain-0.2%2B-1C3C3C?logo=langchain)](https://www.langchain.com/)
 [![Mistral AI](https://img.shields.io/badge/Mistral_AI-mistral--small-orange)](https://mistral.ai/)
@@ -22,7 +22,7 @@
 | 💬 **RAG-powered Q&A** | Chat with your video/meeting using a full RAG pipeline |
 | 🌐 **YouTube Support** | Paste a YouTube URL — audio is downloaded automatically |
 | 📄 **Export** | Save results as PDF or TXT |
-| 🖥️ **Streamlit UI** | Beautiful, dark-themed web interface |
+| 🖥️ **Streamlit UI** | Clean, modern light interface branded **VAANI: Your AI Video Assistant** |
 
 ---
 
@@ -32,7 +32,10 @@
 AI-Video-Assistant/
 ├── app.py                  # Streamlit web app (UI entry point)
 ├── main.py                 # CLI entry point
-├── Requirements.txt        # Python dependencies
+├── requirements.txt        # Python dependencies (pinned)
+├── packages.txt            # System packages for Streamlit Cloud (ffmpeg)
+├── .env.example            # Template for local API keys
+├── DEPLOYMENT.md           # Streamlit Cloud deployment + API key guide
 │
 ├── core/
 │   ├── transcriber.py      # Whisper (English) + Sarvam AI (Hinglish) STT
@@ -42,7 +45,8 @@ AI-Video-Assistant/
 │   └── vector_store.py     # ChromaDB vector store builder & retriever
 │
 └── utils/
-    └── audio_processor.py  # YouTube download (yt-dlp) + audio chunking (pydub)
+    ├── audio_processor.py  # YouTube download (yt-dlp) + audio chunking (pydub)
+    └── exporter.py         # PDF / TXT export
 ```
 
 ### Pipeline Flow
@@ -81,7 +85,7 @@ Input (YouTube URL / Local File)
 
 ### Prerequisites
 
-- **Python 3.10+**
+- **Python 3.12** (pydub needs `audioop`, which was removed in Python 3.13)
 - **FFmpeg** installed and available in your system `PATH`
   - Windows: `winget install ffmpeg` or [ffmpeg.org](https://ffmpeg.org/download.html)
   - macOS: `brew install ffmpeg`
@@ -97,26 +101,26 @@ cd AI-Video-Assistant
 ### 2. Create a Virtual Environment
 
 ```bash
-python -m venv venv
+py -3.12 -m venv .venv      # Windows  (macOS/Linux: python3.12 -m venv .venv)
 
 # Windows
-venv\Scripts\activate
+.venv\Scripts\Activate.ps1   # PowerShell  (cmd: .venv\Scripts\activate.bat)
 
 # macOS / Linux
-source venv/bin/activate
+source .venv/bin/activate
 ```
 
 ### 3. Install Dependencies
 
 ```bash
-pip install -r Requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 > ⚠️ Installing `torch` and `openai-whisper` may take several minutes depending on your internet speed.
 
 ### 4. Configure API Keys
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` in the project root and fill in your keys (`.env` is git-ignored):
 
 ```env
 # Required for LLM summarization and RAG Q&A
@@ -129,7 +133,7 @@ SARVAM_API_KEY=your_sarvam_api_key_here
 WHISPER_MODEL=small
 
 # Optional: change Sarvam STT model
-SARVAM_STT_MODEL=saaras:v2.5
+SARVAM_STT_MODEL=saaras:v3
 ```
 
 Get your API keys:
@@ -149,7 +153,7 @@ streamlit run app.py
 Then open [http://localhost:8501](http://localhost:8501) in your browser.
 
 **Workflow in the UI:**
-1. Paste a **YouTube URL** or upload a **local audio/video file**
+1. Paste a **YouTube URL** (or a local file path) or upload a **local audio/video file**
 2. Select the language: **English** or **Hinglish**
 3. Click **Analyze** and wait for processing
 4. Browse the generated **Summary**, **Action Items**, **Key Decisions**, and **Open Questions**
@@ -173,14 +177,21 @@ After processing, results are printed to the terminal and you enter an interacti
 
 ---
 
+## ☁️ Deploy on Streamlit Community Cloud
+
+The repository is ready for Streamlit Community Cloud (`requirements.txt`, `packages.txt`, `app.py`). Select **Python 3.12** and add `MISTRAL_API_KEY` (and `SARVAM_API_KEY` for Hinglish) under **Secrets**. See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
+
+---
+
 ## 🔧 Configuration
 
 | Environment Variable | Default | Description |
 |---|---|---|
 | `MISTRAL_API_KEY` | *(required)* | Mistral API key for LLM features |
+| `MISTRAL_MODEL` | `mistral-small-latest` | Mistral chat model (`ministral-14b-latest` works on Mistral's free tier) |
 | `SARVAM_API_KEY` | *(required for Hinglish)* | Sarvam API key for Hinglish transcription |
 | `WHISPER_MODEL` | `small` | Whisper model size (`tiny`, `base`, `small`, `medium`, `large`) |
-| `SARVAM_STT_MODEL` | `saaras:v2.5` | Sarvam STT model version |
+| `SARVAM_STT_MODEL` | `saaras:v3` | Sarvam STT model version (`saaras:v3` / `saaras:v4`; legacy `saaras:v2.5` still accepted) |
 
 > **Whisper Model Tradeoffs**: Larger models are more accurate but slower and require more RAM. `small` is a good balance for most use cases.
 

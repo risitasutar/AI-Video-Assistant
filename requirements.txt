@@ -1,0 +1,53 @@
+# ── AI Video Assistant ── requirements.txt ────────────────────────────────────
+# Python 3.12 (must match the Python version selected on Streamlit Community Cloud)
+# Versions are pinned to the set verified with this codebase (LangChain 0.3 line).
+# System dependency: the FFmpeg binary (see packages.txt for Streamlit Cloud).
+
+# ── Audio / Video acquisition ─────────────────────────────────────────────────
+yt-dlp[default]>=2026.8.19        # YouTube download — floor only: YouTube changes often, newest is safest.
+                                  # [default] adds yt-dlp-ejs (YouTube challenge solver scripts)
+deno==2.9.7                       # JavaScript runtime yt-dlp needs for YouTube (official Deno binary redistribution)
+pydub==0.25.1                     # Audio file manipulation / format conversion
+ffmpeg-python==0.2.0              # FFmpeg bindings (FFmpeg binary must be installed separately)
+
+# ── Speech-to-Text (local Whisper) ────────────────────────────────────────────
+openai-whisper==20250625          # OpenAI Whisper (runs locally)
+# PyTorch backend for Whisper + sentence-transformers.
+# Linux (Streamlit Cloud): CPU-only wheel — the default PyPI Linux wheel bundles ~3 GB of CUDA libs.
+# Windows / macOS: the PyPI wheel is already CPU-only.
+torch==2.8.0 ; sys_platform != "linux"
+torch @ https://download.pytorch.org/whl/cpu/torch-2.8.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl ; sys_platform == "linux"
+
+# ── Translation (Hindi → English) ─────────────────────────────────────────────
+deep-translator==1.11.4           # Lightweight translation wrapper (Google backend)
+
+# ── LLM Orchestration — LangChain LCEL + Mistral ──────────────────────────────
+langchain==0.3.27
+langchain-core==0.3.86
+langchain-community==0.3.31
+langchain-text-splitters==0.3.11
+langchain-mistralai==0.2.12       # LangChain wrapper for Mistral API
+mistralai==1.12.4                 # Official Mistral Python client
+
+# ── RAG Pipeline ──────────────────────────────────────────────────────────────
+chromadb==1.1.1                   # Local vector store
+langchain-chroma==0.2.6           # LangChain ↔ ChromaDB bridge (imported by core/vector_store.py)
+sentence-transformers==5.1.2      # HuggingFace embedding models
+langchain-huggingface==0.3.1      # LangChain ↔ HuggingFace embeddings bridge
+huggingface-hub==0.36.2           # Model downloading from HuggingFace Hub
+transformers==4.57.6
+tiktoken==0.14.0                  # Token counting for text splitting
+
+# ── Streamlit UI ──────────────────────────────────────────────────────────────
+streamlit==1.50.0
+
+# ── PDF & TXT Export ──────────────────────────────────────────────────────────
+reportlab==4.5.1                  # PDF generation
+fpdf2==2.8.9                      # Lightweight PDF library (used for PDF export)
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv==1.2.4              # Load API keys from .env
+numpy==2.2.6
+tqdm==4.70.1                      # Progress bars
+requests==2.34.2
+httpx==0.28.1                     # HTTP errors from the Mistral client (retry on 429)
