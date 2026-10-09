@@ -61,27 +61,44 @@ def download_youtube_audio(url :str) ->str:
         pass  # fall back to a system-wide deno on PATH, if any
     # YouTube intermittently answers 403 for a stream URL; each attempt re-extracts fresh URLs,
     # and a retry usually succeeds. Other errors (unavailable/private video...) fail immediately.
-    for attempt in range(3):
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
-            break
-        except yt_dlp.utils.DownloadError as e:
-            if "403" in str(e) and attempt < 2:
-                print(f"YouTube returned 403, retrying ({attempt + 2}/3)...")
-                time.sleep(2)
-                continue
-            reason = str(e).replace("ERROR: ", "").strip()
-            message = f"Unable to download audio from this YouTube URL. {reason}"
-            if "403" in str(e):  # still blocked after all retries
-                message += (" YouTube may block downloads from cloud-hosted servers. Please download the "
-                            "video or audio file yourself and use 'Upload a video or audio file' in the "
-                            "sidebar instead.")
-            raise UserFacingError(message) from e
-    if not os.path.exists(filename):
-        raise UserFacingError("Unable to download audio from this YouTube URL (no audio file was produced).")
-    return filename
+    # If the default clients are still blocked (403) after their retries, make one bounded fallback
+    # with yt-dlp's "web_embedded" player client, which yt-dlp documents as not needing a PO token
+    # (it only works for videos that allow embedding).
+    plans = [
+        ("default", None, 3),
+        ("web_embedded", {"youtube": {"player_client": ["web_embedded"]}}, 2),
+    ]
+    blocked = None  # the default clients' final 403 error, once they are exhausted
+    for client, extractor_args, max_attempts in plans:
+        opts = dict(ydl_opts, extractor_args=extractor_args) if extractor_args else ydl_opts
+        for attempt in range(max_attempts):
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
+                if not os.path.exists(filename):
+                    raise UserFacingError("Unable to download audio from this YouTube URL (no audio file was produced).")
+                return filename
+            except yt_dlp.utils.DownloadError as e:
+                if "403" in str(e) and attempt < max_attempts - 1:
+                    print(f"YouTube returned 403 ({client} client), retrying ({attempt + 2}/{max_attempts})...")
+                    time.sleep(2)
+                    continue
+                if blocked is None and "403" not in str(e):
+                    reason = str(e).replace("ERROR: ", "").strip()
+                    raise UserFacingError(f"Unable to download audio from this YouTube URL. {reason}") from e
+                if blocked is None:
+                    blocked = e
+                    print("Default YouTube clients still blocked (403); trying the web_embedded fallback...")
+                else:
+                    print(f"web_embedded fallback failed: {e}")  # 403 again, or unsupported for this video
+                break
+    reason = str(blocked).replace("ERROR: ", "").strip()
+    raise UserFacingError(
+        f"Unable to download audio from this YouTube URL. {reason} YouTube may block downloads from "
+        "cloud-hosted servers (an alternative download method was also tried). Please download the "
+        "video or audio file yourself and use 'Upload a video or audio file' in the sidebar instead."
+    ) from blocked
 
 
 
