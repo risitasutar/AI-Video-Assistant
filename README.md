@@ -189,6 +189,7 @@ The repository is ready for Streamlit Community Cloud (`requirements.txt`, `pack
 |---|---|---|
 | `MISTRAL_API_KEY` | *(required)* | Mistral API key for LLM features |
 | `MISTRAL_MODEL` | `mistral-small-latest` | Mistral chat model (`ministral-14b-latest` works on Mistral's free tier) |
+| `SUPADATA_API_KEY` | *(recommended for YouTube URLs)* | Supadata transcript API: YouTube URLs use the video's English captions (audio download + Whisper/Sarvam is the fallback) |
 | `SARVAM_API_KEY` | *(required for Hinglish)* | Sarvam API key for Hinglish transcription |
 | `WHISPER_MODEL` | `small` | Whisper model size (`tiny`, `base`, `small`, `medium`, `large`) |
 | `SARVAM_STT_MODEL` | `saaras:v3` | Sarvam STT model version (`saaras:v3` / `saaras:v4`; legacy `saaras:v2.5` still accepted) |

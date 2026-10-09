@@ -31,6 +31,7 @@ except Exception:
 from utils.audio_processor import process_input, cleanup_files, DOWNLOAD_DIR
 from utils.exporter import build_txt, build_pdf
 from utils.errors import UserFacingError
+from utils.supadata import get_transcript_for_source, is_url
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_action_items, extract_key_decisions, extract_questions
@@ -429,6 +430,8 @@ if run_btn:
             "extract": "Extracting action items, decisions and questions",
             "rag": "Building the chat index",
         }
+        if uploaded_file is None and is_url(source.strip()):
+            step_labels["audio"] = "Fetching the video's transcript (audio is downloaded only if needed)"
 
         def update_step(key, state):
             st.session_state.pipeline_steps[key] = state
@@ -437,6 +440,7 @@ if run_btn:
 
         upload_path = None
         chunks = []
+        transcript_source = "audio"
         try:
             update_step("audio", "active")
             if uploaded_file is not None:
@@ -446,13 +450,15 @@ if run_btn:
                 with os.fdopen(fd, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 chunks = process_input(upload_path)
-            else:
-                chunks = process_input(source.strip())
-            update_step("audio", "done")
+                update_step("audio", "done")
 
-            update_step("transcript", "active")
-            transcript = transcribe_all(chunks, language)
-            update_step("transcript", "done")
+                update_step("transcript", "active")
+                transcript = transcribe_all(chunks, language)
+                update_step("transcript", "done")
+            else:
+                # YouTube URL: Supadata transcript first, the existing audio pipeline as fallback.
+                # A local file path goes straight to the existing audio pipeline.
+                transcript, transcript_source = get_transcript_for_source(source.strip(), language, on_step=update_step)
 
             update_step("title", "active")
             title = generate_title(transcript)
@@ -481,6 +487,7 @@ if run_btn:
                 "open_questions": questions,
                 "rag_chain": rag_chain,
                 "language": language,
+                "transcript_source": transcript_source,
             }
             st.session_state.pipeline_done = True
             render_progress(progress_placeholder, st.session_state.pipeline_steps, "Opening your results…", finished=True)
@@ -512,7 +519,8 @@ if st.session_state.result:
     r = st.session_state.result
     words = len(r["transcript"].split())
     lang = r.get("language", "english")
-    engine = "Sarvam AI" if lang == "hinglish" else "Whisper"
+    engine = ("YouTube captions (Supadata)" if r.get("transcript_source") == "supadata"
+              else "Sarvam AI" if lang == "hinglish" else "Whisper")
 
     # Title card
     st.markdown(

@@ -9,6 +9,7 @@ How to run **AI Video Assistant** locally and deploy it on **Streamlit Community
 | Variable | Required? | Used in | What stops working without it |
 |---|---|---|---|
 | `MISTRAL_API_KEY` | **Mandatory** | `core/summarizer.py`, `core/extractor.py`, `core/rag_engine.py` | Title, summary, action items, key decisions, open questions, RAG chat (the app refuses to start an analysis) |
+| `SUPADATA_API_KEY` | **Recommended for YouTube URLs** | `utils/supadata.py` | YouTube URLs are fetched as captions via Supadata; without it VAANI downloads the audio instead, which YouTube often blocks (HTTP 403) on Streamlit Cloud. Uploads are unaffected |
 | `SARVAM_API_KEY` | **Only for Hinglish** | `core/transcriber.py` | Hinglish transcription (English/Whisper still works) |
 | `MISTRAL_MODEL` | Optional (default `mistral-small-latest`) | `core/summarizer.py`, `core/extractor.py`, `core/rag_engine.py` | — use `ministral-14b-latest` on Mistral's free tier (mistral-small has 0 quota there) |
 | `WHISPER_MODEL` | Optional (default `small`) | `core/transcriber.py` | — (`tiny` / `base` / `small` / `medium` / `large`) |
@@ -107,6 +108,7 @@ Steps:
      ```toml
      MISTRAL_API_KEY = "paste-your-mistral-key-here"
      SARVAM_API_KEY = "paste-your-sarvam-key-here"
+     SUPADATA_API_KEY = "paste-your-supadata-key-here"
      MISTRAL_MODEL = "ministral-14b-latest"
      WHISPER_MODEL = "small"
      SARVAM_STT_MODEL = "saaras:v3"
@@ -114,6 +116,7 @@ Steps:
 
      - `MISTRAL_API_KEY` is mandatory.
      - `SARVAM_API_KEY` is only needed for Hinglish; delete that line if you don't use it.
+     - `SUPADATA_API_KEY` (from https://supadata.ai, dashboard → API key) makes YouTube URLs work on Streamlit Cloud: VAANI fetches the video's English captions instead of downloading audio. Free plan: 100 credits/month, 1 credit per video with existing captions, 2 credits per minute when Supadata has to generate a transcript. Without it, YouTube URLs fall back to audio download.
      - `MISTRAL_MODEL`: keep `ministral-14b-latest` on the free tier, where `mistral-small-latest` has a quota of 0. Remove the line if your plan includes mistral-small.
      - The last two lines are optional (those are the defaults).
 5. Click **Deploy**.

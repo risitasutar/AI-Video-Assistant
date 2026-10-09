@@ -1,8 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()   # MUST be before any core/ imports (core/transcriber.py reads env vars at import time)
 
-from utils.audio_processor import process_input
-from core.transcriber import transcribe_all
+from utils.supadata import get_transcript_for_source
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_action_items, extract_key_decisions, extract_questions
 from core.rag_engine import build_rag_chain, ask_question
@@ -11,9 +10,8 @@ from core.rag_engine import build_rag_chain, ask_question
 def run_pipeline(source :str, language :str = "english") -> dict:
     print("starting AI Video Assistant")
 
-    chunks = process_input(source)
-
-    transcript = transcribe_all(chunks,language)
+    # YouTube URL: Supadata transcript first, audio download + Whisper/Sarvam as fallback
+    transcript, _ = get_transcript_for_source(source, language)
     print(f"raw transcription (first 300 characters ) {transcript[:300]}")
 
     title = generate_title(transcript)
