@@ -73,7 +73,12 @@ def download_youtube_audio(url :str) ->str:
                 time.sleep(2)
                 continue
             reason = str(e).replace("ERROR: ", "").strip()
-            raise UserFacingError(f"Unable to download audio from this YouTube URL. {reason}") from e
+            message = f"Unable to download audio from this YouTube URL. {reason}"
+            if "403" in str(e):  # still blocked after all retries
+                message += (" YouTube may block downloads from cloud-hosted servers. Please download the "
+                            "video or audio file yourself and use 'Upload a video or audio file' in the "
+                            "sidebar instead.")
+            raise UserFacingError(message) from e
     if not os.path.exists(filename):
         raise UserFacingError("Unable to download audio from this YouTube URL (no audio file was produced).")
     return filename
