@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.35%2B-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![LangChain](https://img.shields.io/badge/LangChain-0.2%2B-1C3C3C?logo=langchain)](https://www.langchain.com/)
-[![Mistral AI](https://img.shields.io/badge/Mistral_AI-mistral--small-orange)](https://mistral.ai/)
+[![Google Gemini](https://img.shields.io/badge/Google_Gemini-flash--lite-4285F4)](https://ai.google.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -15,7 +15,7 @@
 | Feature | Description |
 |---|---|
 | 🎙️ **Audio Transcription** | Local Whisper model for English; Sarvam AI for Hinglish |
-| 📝 **Smart Summarization** | Map-reduce summarization with Mistral LLM |
+| 📝 **Smart Summarization** | Map-reduce summarization with Google Gemini |
 | ✅ **Action Item Extraction** | Automatically surfaces tasks and follow-ups |
 | 🔑 **Key Decision Extraction** | Highlights decisions made during the meeting |
 | ❓ **Open Question Detection** | Flags unresolved questions from the transcript |
@@ -39,9 +39,9 @@ AI-Video-Assistant/
 │
 ├── core/
 │   ├── transcriber.py      # Whisper (English) + Sarvam AI (Hinglish) STT
-│   ├── summarizer.py       # Map-reduce summarization via Mistral LLM
+│   ├── summarizer.py       # Map-reduce summarization via Gemini
 │   ├── extractor.py        # Action items, key decisions, open questions
-│   ├── rag_engine.py       # LangChain LCEL RAG pipeline (Mistral + ChromaDB)
+│   ├── rag_engine.py       # LangChain LCEL RAG pipeline (Gemini + ChromaDB)
 │   └── vector_store.py     # ChromaDB vector store builder & retriever
 │
 └── utils/
@@ -66,7 +66,7 @@ Input (YouTube URL / Local File)
   └── Hinglish → Sarvam AI (translates to English)
         │
         ▼
-  Mistral LLM Processing
+  Gemini LLM Processing
   ├── Summary (Map-Reduce)
   ├── Action Items
   ├── Key Decisions
@@ -124,7 +124,7 @@ Copy `.env.example` to `.env` in the project root and fill in your keys (`.env` 
 
 ```env
 # Required for LLM summarization and RAG Q&A
-MISTRAL_API_KEY=your_mistral_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
 
 # Required ONLY for Hinglish transcription
 SARVAM_API_KEY=your_sarvam_api_key_here
@@ -137,7 +137,7 @@ SARVAM_STT_MODEL=saaras:v3
 ```
 
 Get your API keys:
-- **Mistral AI**: [console.mistral.ai](https://console.mistral.ai/)
+- **Google Gemini**: [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 - **Sarvam AI** *(Hinglish only)*: [sarvam.ai](https://www.sarvam.ai/)
 
 ---
@@ -179,7 +179,7 @@ After processing, results are printed to the terminal and you enter an interacti
 
 ## ☁️ Deploy on Streamlit Community Cloud
 
-The repository is ready for Streamlit Community Cloud (`requirements.txt`, `packages.txt`, `app.py`). Select **Python 3.12** and add `MISTRAL_API_KEY` (and `SARVAM_API_KEY` for Hinglish) under **Secrets**. See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
+The repository is ready for Streamlit Community Cloud (`requirements.txt`, `packages.txt`, `app.py`). Select **Python 3.12** and add `GEMINI_API_KEY` (and `SARVAM_API_KEY` for Hinglish) under **Secrets**. See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
 
 ---
 
@@ -187,8 +187,8 @@ The repository is ready for Streamlit Community Cloud (`requirements.txt`, `pack
 
 | Environment Variable | Default | Description |
 |---|---|---|
-| `MISTRAL_API_KEY` | *(required)* | Mistral API key for LLM features |
-| `MISTRAL_MODEL` | `mistral-small-latest` | Mistral chat model (`ministral-14b-latest` works on Mistral's free tier) |
+| `GEMINI_API_KEY` | *(required)* | Google Gemini API key for LLM features |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Gemini chat model (free-tier Flash-Lite by default) |
 | `SUPADATA_API_KEY` | *(recommended for YouTube URLs)* | Supadata transcript API: YouTube URLs use the video's English captions (audio download + Whisper/Sarvam is the fallback) |
 | `SARVAM_API_KEY` | *(required for Hinglish)* | Sarvam API key for Hinglish transcription |
 | `WHISPER_MODEL` | `small` | Whisper model size (`tiny`, `base`, `small`, `medium`, `large`) |
@@ -205,8 +205,7 @@ The repository is ready for Streamlit Community Cloud (`requirements.txt`, `pack
 | `openai-whisper` | Local speech-to-text (English) |
 | `yt-dlp` | YouTube audio downloading |
 | `pydub` / `ffmpeg-python` | Audio processing & chunking |
-| `langchain` + `langchain-mistralai` | LLM orchestration (LCEL) |
-| `mistralai` | Mistral AI API client |
+| `langchain` + `langchain-google-genai` | LLM orchestration (LCEL) with Google Gemini |
 | `chromadb` | Local vector store for RAG |
 | `sentence-transformers` | HuggingFace embeddings |
 | `streamlit` | Web UI framework |
@@ -240,4 +239,4 @@ This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) f
 
 ---
 
-<p align="center">Made with ❤️ using Python, LangChain, and Mistral AI</p>
+<p align="center">Made with ❤️ using Python, LangChain, and Google Gemini</p>

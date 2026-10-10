@@ -1,7 +1,7 @@
 import os
 import re
-import httpx
-from langchain_mistralai import ChatMistralAI
+from core.llm import get_llm as _gemini_llm
+from utils.errors import UserFacingError
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
@@ -58,13 +58,7 @@ def _history_messages(history):
 
 
 def get_llm():
-    llm = ChatMistralAI(
-        model=os.getenv("MISTRAL_MODEL", "mistral-small-latest"),
-        mistral_api_key=os.getenv("MISTRAL_API_KEY"),
-        temperature=0.1,
-    )
-    # retry HTTP errors such as 429 (free-tier rate limits), ~30s total backoff
-    return llm.with_retry(retry_if_exception_type=(httpx.HTTPStatusError,), stop_after_attempt=6)
+    return _gemini_llm(temperature=0.1)
 
 def format_docs(docs):
     # Put retrieved chunks back in transcript order so cross-section answers read coherently
@@ -107,6 +101,8 @@ def _build_chain(retriever):
 
 
 def build_rag_chain(transcript:str):
+    if not (transcript or "").strip():
+        raise UserFacingError("The transcript is empty, so there is nothing to analyse.")
 
     vector_store = build_vector_store(transcript)
 

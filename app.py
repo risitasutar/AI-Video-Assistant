@@ -32,6 +32,7 @@ from utils.audio_processor import process_input, cleanup_files, DOWNLOAD_DIR
 from utils.exporter import build_txt, build_pdf
 from utils.errors import UserFacingError
 from utils.supadata import get_transcript_for_source, is_url
+from core.llm import describe_llm_error
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_action_items, extract_key_decisions, extract_questions
@@ -388,7 +389,7 @@ with st.sidebar:
     st.markdown('<div class="v-side-note">English is transcribed with Whisper; Hinglish with Sarvam AI '
                 '(translated to English).</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="v-side-footer">Powered by Whisper · Sarvam AI · Mistral<br>'
+    st.markdown('<div class="v-side-footer">Powered by Whisper · Sarvam AI · Gemini<br>'
                 'ChromaDB · HuggingFace embeddings</div>', unsafe_allow_html=True)
 
 # ─── Top bar ────────────────────────────────────────────────────────────────────
@@ -409,8 +410,8 @@ pipeline_started = False
 if run_btn:
     if not source.strip() and uploaded_file is None:
         st.error("Please enter a YouTube URL or file path, or upload a file.")
-    elif not os.getenv("MISTRAL_API_KEY"):
-        st.error("Mistral API key is not configured. Add MISTRAL_API_KEY to your .env file (local) or Streamlit secrets (cloud).")
+    elif not (os.getenv("GEMINI_API_KEY") or "").strip():
+        st.error("Gemini API key is not configured. Add GEMINI_API_KEY to your .env file (local) or to the app's Secrets on Streamlit Cloud.")
     elif language == "hinglish" and not os.getenv("SARVAM_API_KEY"):
         st.error("Sarvam API key is required for Hinglish transcription. Add SARVAM_API_KEY to your .env file (local) or Streamlit secrets (cloud).")
     else:
@@ -509,7 +510,7 @@ if run_btn:
             elif failed_step == "transcript":
                 message = f"Transcription failed ({type(e).__name__}). Check the server logs for details."
             else:
-                message = f"Mistral AI request failed ({type(e).__name__}). Check that MISTRAL_API_KEY is valid and has quota."
+                message = describe_llm_error(e)  # Gemini quota / rate limit / timeout / key problems, no secrets
             render_progress(progress_placeholder, st.session_state.pipeline_steps, error=f"Error: {message}")
         finally:
             cleanup_files(chunks + [upload_path])
@@ -520,6 +521,7 @@ if st.session_state.result:
     words = len(r["transcript"].split())
     lang = r.get("language", "english")
     engine = ("YouTube captions (Supadata)" if r.get("transcript_source") == "supadata"
+              else "YouTube captions (Supadata), translated to English by Gemini" if r.get("transcript_source") == "supadata_translated"
               else "Sarvam AI" if lang == "hinglish" else "Whisper")
 
     # Title card
@@ -612,7 +614,7 @@ if st.session_state.result:
                 answer = ask_question(r["rag_chain"], user_input.strip(), st.session_state.chat_history)
         except Exception as e:
             logger.exception("RAG question failed")
-            st.error(f"❌ Could not get an answer from Mistral AI ({type(e).__name__}). Please try again.")
+            st.error(f"❌ Could not get an answer: {describe_llm_error(e)}")
         else:
             st.session_state.chat_history.append({"role": "user",      "content": user_input.strip()})
             st.session_state.chat_history.append({"role": "assistant", "content": answer})

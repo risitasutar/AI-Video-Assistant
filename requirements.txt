@@ -21,13 +21,12 @@ torch @ https://download.pytorch.org/whl/cpu/torch-2.8.0%2Bcpu-cp312-cp312-manyl
 # ── Translation (Hindi → English) ─────────────────────────────────────────────
 deep-translator==1.11.4           # Lightweight translation wrapper (Google backend)
 
-# ── LLM Orchestration — LangChain LCEL + Mistral ──────────────────────────────
+# ── LLM Orchestration — LangChain LCEL + Gemini ──────────────────────────────
 langchain==0.3.27
 langchain-core==0.3.86
 langchain-community==0.3.31
 langchain-text-splitters==0.3.11
-langchain-mistralai==0.2.12       # LangChain wrapper for Mistral API
-mistralai==1.12.4                 # Official Mistral Python client
+langchain-google-genai==2.1.12    # LangChain wrapper for the Gemini API (last release for langchain-core 0.3)
 
 # ── RAG Pipeline ──────────────────────────────────────────────────────────────
 chromadb==1.1.1                   # Local vector store
@@ -50,4 +49,3 @@ python-dotenv==1.2.4              # Load API keys from .env
 numpy==2.2.6
 tqdm==4.70.1                      # Progress bars
 requests==2.34.2
-httpx==0.28.1                     # HTTP errors from the Mistral client (retry on 429)

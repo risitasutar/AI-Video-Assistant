@@ -59,8 +59,9 @@ class SupadataAdapterTests(unittest.TestCase):
         segments = [{"text": "Hello  everyone,", "offset": 0, "duration": 1500, "lang": "en"},
                     {"text": "it&#39;s launch\nday &amp; we&#39;re ready.", "offset": 1500, "duration": 2000, "lang": "en"},
                     {"text": "  Thanks! ", "offset": 3500, "duration": 800, "lang": "en"}]
-        transcript, get = self._fetch(_ok(segments))
+        (transcript, lang), get = self._fetch(_ok(segments))
         self.assertEqual(transcript, "Hello everyone, it's launch day & we're ready. Thanks!")
+        self.assertEqual(lang, "en")
         url, = get.call_args.args
         self.assertEqual(url, "https://api.supadata.ai/v1/transcript")
         self.assertEqual(get.call_args.kwargs["params"], {"url": YT, "lang": "en"})
@@ -68,15 +69,15 @@ class SupadataAdapterTests(unittest.TestCase):
         self.assertIsNotNone(get.call_args.kwargs["timeout"])
 
     def test_success_plain_text_content(self):
-        transcript, _ = self._fetch(_ok("  Plain   text transcript. "))
-        self.assertEqual(transcript, "Plain text transcript.")
+        (transcript, lang), _ = self._fetch(_ok("  Plain   text transcript. "))
+        self.assertEqual((transcript, lang), ("Plain text transcript.", "en"))
 
     def test_async_job_is_polled_until_completed(self):
-        transcript, get = self._fetch(
+        (transcript, lang), get = self._fetch(
             _Resp(202, {"jobId": "job-1"}),
             _Resp(200, {"status": "active"}),
             _Resp(200, {"status": "completed", "lang": "en", "content": [{"text": "Done.", "offset": 0, "duration": 1}]}))
-        self.assertEqual(transcript, "Done.")
+        self.assertEqual((transcript, lang), ("Done.", "en"))
         self.assertEqual(get.call_args_list[1].args[0], "https://api.supadata.ai/v1/transcript/job-1")
 
     # ── errors ──
@@ -116,8 +117,10 @@ class SupadataAdapterTests(unittest.TestCase):
         with mock.patch.object(sd, "POLL_MAX_WAIT", -1):
             self.assertIn("too long", self._fetch_error(_Resp(202, {"jobId": "j"}), _Resp(200, {"status": "queued"})))
 
-    def test_non_english_transcript_is_not_used(self):
-        self.assertIn("'hi' transcript", self._fetch_error(_ok([{"text": "नमस्ते", "offset": 0, "duration": 1}], lang="hi")))
+    def test_hindi_transcript_is_returned_with_its_language(self):
+        (transcript, lang), _ = self._fetch(_ok([{"text": "नमस्ते टीम।", "offset": 0, "duration": 1},
+                                                 {"text": "लॉन्च 15 नवंबर को होगा।", "offset": 1, "duration": 1}], lang="hi"))
+        self.assertEqual((transcript, lang), ("नमस्ते टीम। लॉन्च 15 नवंबर को होगा।", "hi"))
 
 
 class TranscriptRoutingTests(unittest.TestCase):
@@ -140,9 +143,11 @@ class TranscriptRoutingTests(unittest.TestCase):
         return sd.get_transcript_for_source(source, language, on_step=lambda k, s: self.steps.append((k, s)))
 
     def test_supadata_success_bypasses_audio_pipeline(self):
-        with mock.patch.object(sd, "fetch_youtube_transcript", return_value="Caption transcript.") as fetch:
+        with mock.patch.object(sd, "fetch_youtube_transcript", return_value=("Caption transcript.", "en")) as fetch, \
+                mock.patch.object(sd, "translate_to_english") as translate:
             transcript, method = self._get(YT)
         self.assertEqual((transcript, method), ("Caption transcript.", "supadata"))
+        translate.assert_not_called()                          # English captions are used as they are
         fetch.assert_called_once_with(YT)
         self.process_input.assert_not_called()
         self.transcribe_all.assert_not_called()
@@ -156,6 +161,54 @@ class TranscriptRoutingTests(unittest.TestCase):
         self.transcribe_all.assert_called_once_with(["chunk_0.wav"], "hinglish")
         self.cleanup.assert_called_once_with(["chunk_0.wav"])
         self.assertEqual(self.steps, [("audio", "done"), ("transcript", "active"), ("transcript", "done")])
+
+    def test_hindi_transcript_is_translated_and_skips_audio(self):
+        with mock.patch.object(sd, "fetch_youtube_transcript", return_value=("नमस्ते टीम। लॉन्च 15 नवंबर को होगा।", "hi")), \
+                mock.patch.object(sd, "translate_to_english", return_value="Hello team. The launch will be on 15 November.") as translate:
+            transcript, method = self._get(YT, "hinglish")
+        self.assertEqual((transcript, method), ("Hello team. The launch will be on 15 November.", "supadata_translated"))
+        translate.assert_called_once_with("नमस्ते टीम। लॉन्च 15 नवंबर को होगा।")
+        self.process_input.assert_not_called()                 # no audio download (blocked on Streamlit Cloud)
+        self.transcribe_all.assert_not_called()
+        self.assertEqual(self.steps, [("audio", "done"), ("transcript", "done")])
+
+    def test_translation_failure_falls_back_to_audio_pipeline(self):
+        from google.api_core.exceptions import ResourceExhausted
+        with mock.patch.object(sd, "fetch_youtube_transcript", return_value=("नमस्ते", "hi")), \
+                mock.patch.object(sd, "translate_to_english", side_effect=ResourceExhausted("429 quota")):
+            transcript, method = self._get(YT, "hinglish")
+        self.assertEqual((transcript, method), ("Audio transcript.", "audio"))
+        self.transcribe_all.assert_called_once_with(["chunk_0.wav"], "hinglish")   # existing Sarvam/Whisper path
+
+    def test_hindi_translation_and_audio_403_both_failing_is_readable(self):
+        from google.api_core.exceptions import ResourceExhausted
+        self.process_input.side_effect = UserFacingError(
+            "Unable to download audio from this YouTube URL. unable to download video data: HTTP Error 403: Forbidden")
+        with mock.patch.object(sd, "fetch_youtube_transcript", return_value=("नमस्ते", "hi")), \
+                mock.patch.object(sd, "translate_to_english", side_effect=ResourceExhausted("429 quota")):
+            with self.assertRaises(UserFacingError) as ctx:
+                self._get(YT, "hinglish")
+        msg = str(ctx.exception)
+        self.assertIn("a 'hi' transcript was found, but translating it to English failed", msg)
+        self.assertIn("quota", msg)
+        self.assertIn("HTTP Error 403", msg)
+        self.assertIn("Upload a video or audio file", msg)
+
+    def test_missing_gemini_key_during_translation_is_safe(self):
+        with mock.patch.dict(os.environ, {"SUPADATA_API_KEY": FAKE_KEY, "GEMINI_API_KEY": ""}), \
+                mock.patch.object(sd.requests, "get", return_value=_ok([{"text": "नमस्ते", "offset": 0, "duration": 1}], lang="hi")):
+            self.process_input.side_effect = UserFacingError("Unable to download audio from this YouTube URL. HTTP Error 403: Forbidden")
+            with self.assertRaises(UserFacingError) as ctx:
+                self._get(YT)
+        msg = str(ctx.exception)
+        self.assertIn("Gemini API key is not configured", msg)
+        self.assertNotIn(FAKE_KEY, msg)
+
+    def test_missing_supadata_key_falls_back_to_audio(self):
+        with mock.patch.dict(os.environ, {"SUPADATA_API_KEY": ""}), mock.patch.object(sd.requests, "get") as get:
+            transcript, method = self._get(YT)
+        get.assert_not_called()
+        self.assertEqual((transcript, method), ("Audio transcript.", "audio"))
 
     def test_both_methods_failing_gives_readable_error(self):
         self.process_input.side_effect = UserFacingError(

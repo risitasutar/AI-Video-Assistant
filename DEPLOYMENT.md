@@ -8,10 +8,10 @@ How to run **AI Video Assistant** locally and deploy it on **Streamlit Community
 
 | Variable | Required? | Used in | What stops working without it |
 |---|---|---|---|
-| `MISTRAL_API_KEY` | **Mandatory** | `core/summarizer.py`, `core/extractor.py`, `core/rag_engine.py` | Title, summary, action items, key decisions, open questions, RAG chat (the app refuses to start an analysis) |
+| `GEMINI_API_KEY` | **Mandatory** | `core/llm.py` (used by `core/summarizer.py`, `core/extractor.py`, `core/rag_engine.py`) | Title, summary, action items, key decisions, open questions, RAG chat (the app refuses to start an analysis) |
 | `SUPADATA_API_KEY` | **Recommended for YouTube URLs** | `utils/supadata.py` | YouTube URLs are fetched as captions via Supadata; without it VAANI downloads the audio instead, which YouTube often blocks (HTTP 403) on Streamlit Cloud. Uploads are unaffected |
 | `SARVAM_API_KEY` | **Only for Hinglish** | `core/transcriber.py` | Hinglish transcription (English/Whisper still works) |
-| `MISTRAL_MODEL` | Optional (default `mistral-small-latest`) | `core/summarizer.py`, `core/extractor.py`, `core/rag_engine.py` | — use `ministral-14b-latest` on Mistral's free tier (mistral-small has 0 quota there) |
+| `GEMINI_MODEL` | Optional (default `gemini-3.5-flash-lite`) | `core/llm.py` | — any Gemini model your key can use, e.g. `gemini-2.5-flash-lite` |
 | `WHISPER_MODEL` | Optional (default `small`) | `core/transcriber.py` | — (`tiny` / `base` / `small` / `medium` / `large`) |
 | `SARVAM_STT_MODEL` | Optional (default `saaras:v3`) | `core/transcriber.py` | — |
 
@@ -56,19 +56,15 @@ In VS Code, select the interpreter with **Ctrl+Shift+P → Python: Select Interp
 
 ## 3. Get the API keys
 
-### Mistral AI (mandatory)
+### Google Gemini (mandatory)
 
-1. **Why the project needs it:** every LLM step runs on the Mistral model set by `MISTRAL_MODEL` (default `mistral-small-latest`) via LangChain: title, map-reduce summary, the three extractors and RAG Q&A.
-2. **Create an account:** <https://console.mistral.ai>
-3. **Generate a key:**
-   - In the console sidebar, open **API Keys → Create new key**.
-   - Give it a name and an expiration, then create it.
-   - **Copy it immediately.** It is shown only once.
-4. **Cost:** Mistral's docs say Studio starts in *Free mode*: "API access is enabled by default with no credit card required. Usage and rate limits apply." Exact limits are listed in the console. Paid plans raise the limits. Mistral's docs also say requests on the free plan may be used to improve their models.
-5. **Local:** add `MISTRAL_API_KEY=...` to `.env`.
-6. **Cloud:** add it to the app's Secrets (see §4).
+1. **Why the project needs it:** every LLM step runs on the Gemini model set by `GEMINI_MODEL` (default `gemini-3.5-flash-lite`) via LangChain (`langchain-google-genai`): title, map-reduce summary, the three extractors and RAG Q&A.
+2. **Create a key:** sign in at <https://aistudio.google.com/apikey> with a Google account and click **Create API key**.
+3. **Cost:** the Gemini API free tier lists Flash and Flash-Lite models as "Free of charge", with rate limits (requests per minute/day) shown on your [AI Studio rate-limit page](https://aistudio.google.com/rate-limit). Daily limits reset at midnight Pacific time. Do not enable billing if you want to stay free. Google's free-tier terms say content may be used to improve their products.
+4. **Local:** add `GEMINI_API_KEY=...` to `.env`.
+5. **Cloud:** add it to the app's Secrets (see §4).
 
-Docs: <https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key>
+Docs: <https://ai.google.dev/gemini-api/docs/api-key>
 
 ### Sarvam AI (only for Hinglish)
 
@@ -106,18 +102,16 @@ Steps:
    - **Secrets:** paste the block below, with your real keys:
 
      ```toml
-     MISTRAL_API_KEY = "paste-your-mistral-key-here"
+     GEMINI_API_KEY = "paste-your-gemini-key-here"
      SARVAM_API_KEY = "paste-your-sarvam-key-here"
      SUPADATA_API_KEY = "paste-your-supadata-key-here"
-     MISTRAL_MODEL = "ministral-14b-latest"
      WHISPER_MODEL = "small"
      SARVAM_STT_MODEL = "saaras:v3"
      ```
 
-     - `MISTRAL_API_KEY` is mandatory.
+     - `GEMINI_API_KEY` is mandatory.
      - `SARVAM_API_KEY` is only needed for Hinglish; delete that line if you don't use it.
      - `SUPADATA_API_KEY` (from https://supadata.ai, dashboard → API key) makes YouTube URLs work on Streamlit Cloud: VAANI fetches the video's English captions instead of downloading audio. Free plan: 100 credits/month, 1 credit per video with existing captions, 2 credits per minute when Supadata has to generate a transcript. Without it, YouTube URLs fall back to audio download.
-     - `MISTRAL_MODEL`: keep `ministral-14b-latest` on the free tier, where `mistral-small-latest` has a quota of 0. Remove the line if your plan includes mistral-small.
      - The last two lines are optional (those are the defaults).
 5. Click **Deploy**.
    - Cloud installs `ffmpeg` from `packages.txt` and the Python packages from `requirements.txt`.
@@ -133,7 +127,7 @@ Steps:
 
 - [ ] Build log shows no dependency errors, and the app launches
 - [ ] Clicking **Analyse** without input shows "Please enter a YouTube URL…" (UI works)
-- [ ] Mistral configured: no "Mistral API key is not configured" message
+- [ ] Gemini configured: no "Gemini API key is not configured" message
 - [ ] Sarvam configured, if Hinglish is used
 - [ ] **Local upload:** a small MP3/MP4 (1–2 min) goes through the whole pipeline
 - [ ] **English transcription (Whisper):** the transcript expander shows correct text

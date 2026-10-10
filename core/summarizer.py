@@ -1,11 +1,11 @@
-from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 
-import httpx
 import os
+from core.llm import get_llm as _gemini_llm
+from utils.errors import UserFacingError
 
 # Shared grounding rules: the transcript may be a meeting OR any other video (lecture, talk, vlog)
 GROUNDING_RULES = (
@@ -24,9 +24,7 @@ SINGLE_PASS_CHARS = 16000
 
 
 def get_llm():
-    llm = ChatMistralAI(model = os.getenv("MISTRAL_MODEL", "mistral-small-latest"), mistral_api_key = os.getenv("MISTRAL_API_KEY"),temperature=0.2)
-    # retry HTTP errors such as 429 (free-tier rate limits), ~30s total backoff
-    return llm.with_retry(retry_if_exception_type=(httpx.HTTPStatusError,), stop_after_attempt=6)
+    return _gemini_llm(temperature=0.2)
 
 
 def split_transcript(transcript: str) -> list:
@@ -46,6 +44,8 @@ SUMMARY_INSTRUCTIONS = (
 )
 
 def summarize(transcript : str) -> str:
+    if not (transcript or "").strip():
+        raise UserFacingError("The transcript is empty, so there is nothing to analyse.")
     llm = get_llm()
 
     final_prompt = ChatPromptTemplate.from_messages(
@@ -104,6 +104,8 @@ def _clean_title(title: str) -> str:
 
 
 def generate_title(transcipt : str) -> str:
+    if not (transcipt or "").strip():
+        raise UserFacingError("The transcript is empty, so there is nothing to analyse.")
     llm = get_llm()
 
 

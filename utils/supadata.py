@@ -16,6 +16,8 @@ import requests
 
 from utils.audio_processor import process_input, cleanup_files
 from core.transcriber import transcribe_all
+from core.translator import translate_to_english
+from core.llm import describe_llm_error
 from utils.errors import UserFacingError
 
 SUPADATA_URL = "https://api.supadata.ai/v1/transcript"
@@ -84,8 +86,11 @@ def _get(url: str, params: dict, key: str):
         raise SupadataError("could not connect to Supadata.") from None
 
 
-def fetch_youtube_transcript(url: str) -> str:
-    """Return the video's English transcript as plain text, or raise SupadataError."""
+def fetch_youtube_transcript(url: str) -> tuple:
+    """Return (transcript text, language code) for the video, or raise SupadataError.
+
+    English is requested; if the video only has captions in another language (e.g. Hindi), those
+    are returned with their language code instead of being rejected."""
     key = (os.getenv("SUPADATA_API_KEY") or "").strip()
     if not key:
         raise SupadataError("SUPADATA_API_KEY is not configured.")
@@ -117,12 +122,12 @@ def fetch_youtube_transcript(url: str) -> str:
     transcript = _normalize(data["content"])
     if not transcript:
         raise SupadataError("Supadata returned an empty transcript.")
-    lang = str(data.get("lang") or "")
-    if lang and not lang.lower().startswith("en"):
-        # VAANI's analysis works on English text (Whisper English / Sarvam translate); the audio
-        # pipeline handles other languages (e.g. Hinglish via Sarvam) instead.
-        raise SupadataError(f"only a '{lang}' transcript is available (VAANI needs English).")
-    return transcript
+    lang = str(data.get("lang") or "en").strip().lower()
+    return transcript, lang
+
+
+def is_english(lang: str) -> bool:
+    return lang.startswith("en")
 
 
 def get_transcript_for_source(source: str, language: str, on_step=None) -> tuple:
@@ -130,18 +135,32 @@ def get_transcript_for_source(source: str, language: str, on_step=None) -> tuple
 
     YouTube/other URL: Supadata first; if it fails, the existing audio pipeline (yt-dlp + Whisper/Sarvam).
     Local file path: the existing audio pipeline only.
-    Returns (transcript, method) where method is "supadata" or "audio".
+    Returns (transcript, method) where method is "supadata", "supadata_translated" (non-English
+    captions such as Hindi, translated to English with Gemini) or "audio".
     on_step(key, state) reports progress with the app's step keys ("audio", "transcript").
     """
     on_step = on_step or (lambda key, state: None)
     supadata_error = None
     if is_url(source):
         try:
-            transcript = fetch_youtube_transcript(source)
-            print(f"Transcript from Supadata ({len(transcript)} chars); skipping audio download and transcription.")
+            transcript, lang = fetch_youtube_transcript(source)
+            method = "supadata"
+            if not is_english(lang):
+                # e.g. Hindi captions: VAANI's analysis and English-only embeddings need English text,
+                # the same outcome the audio path gives (Sarvam translate / Whisper English)
+                print(f"Supadata returned a '{lang}' transcript; translating it to English with Gemini...")
+                try:
+                    transcript = translate_to_english(transcript)
+                except Exception as e:
+                    raise SupadataError(f"a '{lang}' transcript was found, but translating it to English "
+                                        f"failed: {describe_llm_error(e)}") from e
+                if not transcript:
+                    raise SupadataError(f"a '{lang}' transcript was found, but its English translation was empty.")
+                method = "supadata_translated"
+            print(f"Transcript from Supadata ({len(transcript)} chars, {lang}); skipping audio download and transcription.")
             on_step("audio", "done")
             on_step("transcript", "done")
-            return transcript, "supadata"
+            return transcript, method
         except SupadataError as e:
             supadata_error = e
             print(f"Supadata transcript unavailable ({e}); falling back to audio download.")

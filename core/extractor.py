@@ -1,18 +1,16 @@
 #Actionableitems , decision , questions
 
-from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from core.summarizer import GROUNDING_RULES, SINGLE_PASS_CHARS, split_transcript
-import httpx
 import os
+from core.llm import get_llm as _gemini_llm
+from utils.errors import UserFacingError
 
 
 def get_llm():
-    llm = ChatMistralAI(model = os.getenv("MISTRAL_MODEL", "mistral-small-latest"), mistral_api_key = os.getenv("MISTRAL_API_KEY"),temperature=0.1)
-    # retry HTTP errors such as 429 (free-tier rate limits), ~30s total backoff
-    return llm.with_retry(retry_if_exception_type=(httpx.HTTPStatusError,), stop_after_attempt=6)
+    return _gemini_llm(temperature=0.1)
 
 
 OUTPUT_RULES = (
@@ -59,6 +57,8 @@ def build_chain(system_prompt : str):
 
 
 def _extract(transcript: str, task_prompt: str, none_text: str) -> str:
+    if not (transcript or "").strip():
+        raise UserFacingError("The transcript is empty, so there is nothing to analyse.")
     none_rule = f"If there are none, reply exactly: {none_text}"
     if len(transcript) <= SINGLE_PASS_CHARS:
         return build_chain(task_prompt + none_rule).invoke(transcript)
