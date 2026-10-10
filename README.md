@@ -10,6 +10,9 @@
 
 ---
 
+🔗 Try VAANI here:
+https://ai-video-assistant-iypxnibyydt3qxhxjrav4.streamlit.app
+
 ## ✨ Features
 
 | Feature | Description |
